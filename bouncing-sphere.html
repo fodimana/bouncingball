@@ -159,6 +159,8 @@
 
 
 
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
   const paddleBottom = H - PADDLE_Y_OFFSET;
   const paddleTop    = paddleBottom - PADDLE_H;
 
