@@ -398,21 +398,62 @@
   }
 
   function drawBall(b) {
-    const c = b.colors;
-    const glow = ctx.createRadialGradient(b.x - b.r*0.3, b.y - b.r*0.35, b.r*0.05, b.x, b.y, b.r*1.6);
-    glow.addColorStop(0, c.glowA); glow.addColorStop(0.5, c.glowB); glow.addColorStop(1, c.glowC);
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.6, 0, Math.PI * 2);
+    const x = b.x, y = b.y, r = b.r;
+    ctx.save();
+
+    // Glow
+    const glow = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 1.8);
+    glow.addColorStop(0, 'rgba(255,220,160,0.3)');
+    glow.addColorStop(1, 'rgba(255,180,80,0)');
+    ctx.beginPath(); ctx.arc(x, y, r * 1.8, 0, Math.PI * 2);
     ctx.fillStyle = glow; ctx.fill();
 
-    const grad = ctx.createRadialGradient(b.x - b.r*0.35, b.y - b.r*0.35, b.r*0.1, b.x, b.y, b.r);
-    grad.addColorStop(0, c.hi); grad.addColorStop(0.4, c.mid); grad.addColorStop(1, c.lo);
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    ctx.fillStyle = grad; ctx.fill();
+    // Head (skin tone circle)
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#f0c080'; ctx.fill();
+    ctx.strokeStyle = '#a0622a'; ctx.lineWidth = 1.5; ctx.stroke();
 
-    const spec = ctx.createRadialGradient(b.x - b.r*0.32, b.y - b.r*0.38, 1, b.x - b.r*0.2, b.y - b.r*0.25, b.r*0.55);
-    spec.addColorStop(0, 'rgba(255,255,255,0.75)'); spec.addColorStop(0.5, 'rgba(255,255,255,0.15)'); spec.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    ctx.fillStyle = spec; ctx.fill();
+    // Wild white hair (arcs above head)
+    ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = r * 0.18;
+    ctx.lineCap = 'round';
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x + i * r * 0.28, y - r * 0.75);
+      ctx.bezierCurveTo(
+        x + i * r * 0.28 + (i * r * 0.2), y - r * 1.5,
+        x + i * r * 0.28 + (i * r * 0.3), y - r * 1.7,
+        x + i * r * 0.28 + (i * r * 0.15), y - r * 1.85
+      );
+      ctx.stroke();
+    }
+
+    // Eyebrows
+    ctx.strokeStyle = '#5a3010'; ctx.lineWidth = r * 0.1; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - r*0.45, y - r*0.25); ctx.lineTo(x - r*0.15, y - r*0.32); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + r*0.15, y - r*0.32); ctx.lineTo(x + r*0.45, y - r*0.25); ctx.stroke();
+
+    // Glasses frames
+    ctx.strokeStyle = '#222'; ctx.lineWidth = r * 0.09;
+    ctx.beginPath(); ctx.arc(x - r*0.3, y - r*0.1, r*0.22, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + r*0.3, y - r*0.1, r*0.22, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - r*0.08, y - r*0.1); ctx.lineTo(x + r*0.08, y - r*0.1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - r*0.52, y - r*0.1); ctx.lineTo(x - r*0.72, y - r*0.05); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + r*0.52, y - r*0.1); ctx.lineTo(x + r*0.72, y - r*0.05); ctx.stroke();
+
+    // Eyes (inside lenses)
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(x - r*0.3, y - r*0.1, r*0.07, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + r*0.3, y - r*0.1, r*0.07, 0, Math.PI*2); ctx.fill();
+
+    // Nose
+    ctx.strokeStyle = '#a06030'; ctx.lineWidth = r*0.08; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y - r*0.05); ctx.lineTo(x - r*0.1, y + r*0.2); ctx.lineTo(x + r*0.1, y + r*0.2); ctx.stroke();
+
+    // Smile
+    ctx.strokeStyle = '#7a3a10'; ctx.lineWidth = r*0.09;
+    ctx.beginPath(); ctx.arc(x, y + r*0.15, r*0.25, 0.2, Math.PI - 0.2); ctx.stroke();
+
+    ctx.restore();
   }
 
   function drawPaddle() {
