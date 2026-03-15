@@ -69,7 +69,7 @@
   }
 
   function makeBall(x, y, vx, vy, colors) {
-    return { x, y, vx, vy, r: RADIUS, trail: [], colors, caught: false };
+    return { x, y, vx, vy, r: RADIUS, trail: [], colors, caught: false, hitCount: 0 };
   }
 
   const BALL_DEFS = [
@@ -144,6 +144,7 @@
         score++;
         updateHUD();
         playHit();
+        ball.hitCount++;
         // Knock the ball away from the bullet direction
         ball.vy = -Math.abs(ball.vy) * 1.1 - 4;
         ball.vx += (ball.x - bu.x) * 0.15;
@@ -348,6 +349,7 @@
       score++;
       updateHUD();
       playBounce();
+      b.hitCount++;
     }
 
     // Fell past floor
@@ -399,7 +401,44 @@
 
   function drawBall(b) {
     const x = b.x, y = b.y, r = b.r;
+    const h = b.hitCount;
     ctx.save();
+    ctx.lineCap = 'round';
+
+    // Level 1+: neck
+    if (h >= 1) {
+      ctx.strokeStyle = '#f0c080'; ctx.lineWidth = r * 0.28;
+      ctx.beginPath(); ctx.moveTo(x, y + r * 0.95); ctx.lineTo(x, y + r * 1.3); ctx.stroke();
+    }
+    // Level 2+: torso
+    if (h >= 2) {
+      ctx.strokeStyle = '#4466cc'; ctx.lineWidth = r * 0.52;
+      ctx.beginPath(); ctx.moveTo(x, y + r * 1.3); ctx.lineTo(x, y + r * 2.5); ctx.stroke();
+    }
+    // Level 3+: arms
+    if (h >= 3) {
+      ctx.strokeStyle = '#4466cc'; ctx.lineWidth = r * 0.3;
+      ctx.beginPath(); ctx.moveTo(x - r*0.22, y + r*1.5); ctx.lineTo(x - r*1.1, y + r*2.0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + r*0.22, y + r*1.5); ctx.lineTo(x + r*1.1, y + r*2.0); ctx.stroke();
+    }
+    // Level 4+: hands
+    if (h >= 4) {
+      ctx.fillStyle = '#f0c080';
+      ctx.beginPath(); ctx.arc(x - r*1.15, y + r*2.05, r*0.18, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + r*1.15, y + r*2.05, r*0.18, 0, Math.PI*2); ctx.fill();
+    }
+    // Level 5+: legs
+    if (h >= 5) {
+      ctx.strokeStyle = '#223388'; ctx.lineWidth = r * 0.35;
+      ctx.beginPath(); ctx.moveTo(x - r*0.18, y + r*2.5); ctx.lineTo(x - r*0.35, y + r*3.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + r*0.18, y + r*2.5); ctx.lineTo(x + r*0.35, y + r*3.5); ctx.stroke();
+    }
+    // Level 6+: feet
+    if (h >= 6) {
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.ellipse(x - r*0.5, y + r*3.55, r*0.32, r*0.14, -0.3, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x + r*0.5, y + r*3.55, r*0.32, r*0.14,  0.3, 0, Math.PI*2); ctx.fill();
+    }
 
     // Glow
     const glow = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 1.8);
@@ -413,9 +452,8 @@
     ctx.fillStyle = '#f0c080'; ctx.fill();
     ctx.strokeStyle = '#a0622a'; ctx.lineWidth = 1.5; ctx.stroke();
 
-    // Wild white hair (arcs above head)
+    // Wild white hair
     ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = r * 0.18;
-    ctx.lineCap = 'round';
     for (let i = -2; i <= 2; i++) {
       ctx.beginPath();
       ctx.moveTo(x + i * r * 0.28, y - r * 0.75);
@@ -428,11 +466,11 @@
     }
 
     // Eyebrows
-    ctx.strokeStyle = '#5a3010'; ctx.lineWidth = r * 0.1; ctx.lineCap = 'round';
+    ctx.strokeStyle = '#5a3010'; ctx.lineWidth = r * 0.1;
     ctx.beginPath(); ctx.moveTo(x - r*0.45, y - r*0.25); ctx.lineTo(x - r*0.15, y - r*0.32); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + r*0.15, y - r*0.32); ctx.lineTo(x + r*0.45, y - r*0.25); ctx.stroke();
 
-    // Glasses frames
+    // Glasses
     ctx.strokeStyle = '#222'; ctx.lineWidth = r * 0.09;
     ctx.beginPath(); ctx.arc(x - r*0.3, y - r*0.1, r*0.22, 0, Math.PI*2); ctx.stroke();
     ctx.beginPath(); ctx.arc(x + r*0.3, y - r*0.1, r*0.22, 0, Math.PI*2); ctx.stroke();
@@ -440,13 +478,13 @@
     ctx.beginPath(); ctx.moveTo(x - r*0.52, y - r*0.1); ctx.lineTo(x - r*0.72, y - r*0.05); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + r*0.52, y - r*0.1); ctx.lineTo(x + r*0.72, y - r*0.05); ctx.stroke();
 
-    // Eyes (inside lenses)
+    // Eyes
     ctx.fillStyle = '#111';
     ctx.beginPath(); ctx.arc(x - r*0.3, y - r*0.1, r*0.07, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(x + r*0.3, y - r*0.1, r*0.07, 0, Math.PI*2); ctx.fill();
 
     // Nose
-    ctx.strokeStyle = '#a06030'; ctx.lineWidth = r*0.08; ctx.lineCap = 'round';
+    ctx.strokeStyle = '#a06030'; ctx.lineWidth = r*0.08;
     ctx.beginPath(); ctx.moveTo(x, y - r*0.05); ctx.lineTo(x - r*0.1, y + r*0.2); ctx.lineTo(x + r*0.1, y + r*0.2); ctx.stroke();
 
     // Smile
