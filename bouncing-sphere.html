@@ -387,9 +387,10 @@
       // Reset the ball
       b.x  = W / 2;
       b.y  = H / 4;
-      b.vx = BALL_DEFS[0].vx * (1 + score * 0.02);
+      b.vx = BALL_DEFS[0].vx;
       b.vy = BALL_DEFS[0].vy;
       b.trail = [];
+      b.hitCount = 0;
     }
 
     b.trail.push({ x: b.x, y: b.y });
