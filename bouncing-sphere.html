@@ -137,7 +137,8 @@
       if (Math.sqrt(dx*dx + dy*dy) < ball.r + 4) {
         score++;
         updateHUD();
-        playHit(); from the bullet direction
+        playHit();
+        // Knock the ball away from the bullet direction
         ball.vy = -Math.abs(ball.vy) * 1.1 - 4;
         ball.vx += (ball.x - bu.x) * 0.15;
         return false;
