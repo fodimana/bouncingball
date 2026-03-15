@@ -674,7 +674,7 @@
 
     ctx.font = '20px monospace';
     ctx.fillStyle = '#aaa';
-    ctx.fillText('Enter your name (↑↓ to change, → to confirm)', W/2, H/2 - 30);
+    ctx.fillText('Type letters or use ↑↓ to change, → to advance, ⌫ to delete', W/2, H/2 - 30);
 
     // Draw the 3 letter boxes
     const boxW = 52, boxH = 60, gap = 18;
@@ -771,6 +771,15 @@
       if (e.code === 'ArrowDown') { e.preventDefault(); nameChars[nameCursor] = String.fromCharCode((nameChars[nameCursor].charCodeAt(0) - 65 + 25) % 26 + 65); }
       if (e.code === 'ArrowRight' || e.code === 'Tab') { e.preventDefault(); nameCursor = Math.min(2, nameCursor + 1); }
       if (e.code === 'ArrowLeft') { e.preventDefault(); nameCursor = Math.max(0, nameCursor - 1); }
+      if (e.key && e.key.length === 1 && e.key.match(/[a-zA-Z]/)) {
+        nameChars[nameCursor] = e.key.toUpperCase();
+        if (nameCursor < 2) nameCursor++;
+      }
+      if (e.code === 'Backspace') {
+        e.preventDefault();
+        if (nameCursor > 0) { nameCursor--; }
+        nameChars[nameCursor] = 'A';
+      }
       if (e.code === 'Enter') {
         addScore(nameChars.join(''), score);
         enteringName = false;
