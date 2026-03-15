@@ -226,6 +226,95 @@
     o.start(); o.stop(audioCtx.currentTime + 0.4);
   }
 
+  // --- Spooky background music ---
+  let musicNodes = null;
+
+  function startMusic() {
+    if (musicNodes) return;
+    const master = audioCtx.createGain();
+    master.gain.value = 0.18;
+    master.connect(audioCtx.destination);
+
+    // Reverb via convolver
+    const convSize = audioCtx.sampleRate * 2.5;
+    const convBuf = audioCtx.createBuffer(2, convSize, audioCtx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = convBuf.getChannelData(ch);
+      for (let i = 0; i < convSize; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/convSize, 2.5);
+    }
+    const reverb = audioCtx.createConvolver();
+    reverb.buffer = convBuf;
+    const reverbGain = audioCtx.createGain();
+    reverbGain.gain.value = 0.55;
+    reverb.connect(reverbGain); reverbGain.connect(master);
+
+    // Drone: slow detuned sawtooth pair
+    function makeDrone(freq, detune) {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      const filt = audioCtx.createBiquadFilter();
+      o.type = 'sawtooth';
+      o.frequency.value = freq;
+      o.detune.value = detune;
+      filt.type = 'lowpass';
+      filt.frequency.value = 320;
+      g.gain.value = 0.4;
+      o.connect(filt); filt.connect(g); g.connect(master); g.connect(reverb);
+      o.start();
+      return o;
+    }
+    const d1 = makeDrone(55, 0);
+    const d2 = makeDrone(55, 8);
+    const d3 = makeDrone(82.4, -6);
+
+    // Eerie melody: slow arpeggiated minor intervals
+    const melody = [110, 130.8, 146.8, 123.5, 103.8, 116.5, 98, 110];
+    let melIdx = 0;
+    const melOsc = audioCtx.createOscillator();
+    const melGain = audioCtx.createGain();
+    const melFilt = audioCtx.createBiquadFilter();
+    melOsc.type = 'sine';
+    melOsc.frequency.value = melody[0];
+    melFilt.type = 'bandpass'; melFilt.frequency.value = 400; melFilt.Q.value = 2;
+    melGain.gain.value = 0;
+    melOsc.connect(melFilt); melFilt.connect(melGain);
+    melGain.connect(master); melGain.connect(reverb);
+    melOsc.start();
+
+    // Step the melody every 1.8s
+    function stepMelody() {
+      melIdx = (melIdx + 1) % melody.length;
+      const t = audioCtx.currentTime;
+      melOsc.frequency.setValueAtTime(melody[melIdx], t);
+      melGain.gain.cancelScheduledValues(t);
+      melGain.gain.setValueAtTime(0, t);
+      melGain.gain.linearRampToValueAtTime(0.55, t + 0.12);
+      melGain.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
+      melTimer = setTimeout(stepMelody, 1800);
+    }
+    let melTimer = setTimeout(stepMelody, 500);
+
+    // Slow LFO tremolo on drones
+    const lfo = audioCtx.createOscillator();
+    const lfoGain = audioCtx.createGain();
+    lfo.frequency.value = 0.18;
+    lfoGain.gain.value = 0.15;
+    lfo.connect(lfoGain); lfoGain.connect(d1.detune);
+    lfo.start();
+
+    musicNodes = { master, d1, d2, d3, melOsc, lfo, melTimer };
+  }
+
+  function stopMusic() {
+    if (!musicNodes) return;
+    clearTimeout(musicNodes.melTimer);
+    [musicNodes.d1, musicNodes.d2, musicNodes.d3, musicNodes.melOsc, musicNodes.lfo].forEach(n => {
+      try { n.stop(); } catch(e) {}
+    });
+    musicNodes.master.disconnect();
+    musicNodes = null;
+  }
+
   function playMiss() {
     const bufSize = Math.floor(audioCtx.sampleRate * 0.6);
     const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
@@ -378,6 +467,7 @@
       playMiss();
       if (lives <= 0) {
         gameOver = true;
+        stopMusic();
         if (isHighScore(score)) {
           enteringName = true;
           nameChars = ['A','A','A']; nameCursor = 0;
@@ -625,9 +715,13 @@
     enteringName = false; nameChars = ['A','A','A']; nameCursor = 0;
     balls = resetBalls(); bullets = []; flameParticles = []; sparkleParticles = []; doubleBullets = false;
     updateHUD();
+    startMusic();
   }
 
-  canvas.addEventListener('click', () => { if (gameOver && !enteringName) restart(); });
+  canvas.addEventListener('click', () => {
+    if (gameOver && !enteringName) restart();
+    else { audioCtx.resume(); startMusic(); }
+  });
 
   document.addEventListener('keydown', e => {
     if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
@@ -636,8 +730,10 @@
     }
     if (e.code === 'Space') {
       e.preventDefault();
+      audioCtx.resume();
       if (gameOver && !enteringName) { restart(); return; }
       if (!gameOver) {
+        startMusic();
         const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
         const pt = (H - PADDLE_Y_OFFSET) - PADDLE_H;
         if (doubleBullets) {
