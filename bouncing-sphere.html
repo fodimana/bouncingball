@@ -302,12 +302,33 @@
     lfo.connect(lfoGain); lfoGain.connect(d1.detune);
     lfo.start();
 
-    musicNodes = { master, d1, d2, d3, melOsc, lfo, melTimer };
+    // Key-shift: change drone + melody root every 5-10 seconds
+    // Spooky root frequencies (minor/diminished tonalities)
+    const roots = [55, 58.3, 61.7, 49, 51.9, 65.4, 69.3];
+    function shiftKey() {
+      const root = roots[Math.floor(Math.random() * roots.length)];
+      const t = audioCtx.currentTime;
+      const glide = 2.5;
+      d1.frequency.setValueAtTime(d1.frequency.value, t);
+      d1.frequency.exponentialRampToValueAtTime(root, t + glide);
+      d2.frequency.setValueAtTime(d2.frequency.value, t);
+      d2.frequency.exponentialRampToValueAtTime(root, t + glide);
+      d3.frequency.setValueAtTime(d3.frequency.value, t);
+      d3.frequency.exponentialRampToValueAtTime(root * 1.498, t + glide); // perfect 5th
+      // Rescale melody relative to new root
+      const scale = root / 55;
+      melody.forEach((_, i) => { melody[i] = [110,130.8,146.8,123.5,103.8,116.5,98,110][i] * scale; });
+      keyTimer = setTimeout(shiftKey, 5000 + Math.random() * 5000);
+    }
+    let keyTimer = setTimeout(shiftKey, 5000 + Math.random() * 5000);
+
+    musicNodes = { master, d1, d2, d3, melOsc, lfo, melTimer, keyTimer };
   }
 
   function stopMusic() {
     if (!musicNodes) return;
     clearTimeout(musicNodes.melTimer);
+    clearTimeout(musicNodes.keyTimer);
     [musicNodes.d1, musicNodes.d2, musicNodes.d3, musicNodes.melOsc, musicNodes.lfo].forEach(n => {
       try { n.stop(); } catch(e) {}
     });
