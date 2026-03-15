@@ -221,6 +221,8 @@
     g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
     o.start(); o.stop(audioCtx.currentTime + 0.4);
   }
+
+  function playMiss() {
     const bufSize = Math.floor(audioCtx.sampleRate * 0.6);
     const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
     const data = buf.getChannelData(0);
