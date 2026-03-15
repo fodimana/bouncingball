@@ -201,7 +201,70 @@
     o.start(); o.stop(audioCtx.currentTime + 0.25);
   }
 
+  function playMiss() {
+    const bufSize = Math.floor(audioCtx.sampleRate * 0.6);
+    const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const flt = audioCtx.createBiquadFilter();
+    flt.type = 'bandpass';
+    flt.frequency.setValueAtTime(300, audioCtx.currentTime);
+    flt.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.5);
+    flt.Q.value = 0.8;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(1.0, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+    src.connect(flt); flt.connect(g); g.connect(audioCtx.destination);
+    src.start(); src.stop(audioCtx.currentTime + 0.6);
+  }
 
+  // --- Flame particles ---
+  let flameParticles = [];
+
+  function spawnFlames() {
+    for (let i = 0; i < 120; i++) {
+      flameParticles.push({
+        x: Math.random() * W,
+        y: H + Math.random() * 10,
+        vx: (Math.random() - 0.5) * 5,
+        vy: -(Math.random() * 10 + 5),
+        life: 1.0,
+        decay: Math.random() * 0.018 + 0.012,
+        size: Math.random() * 22 + 10,
+      });
+    }
+  }
+
+  function updateFlames() {
+    flameParticles = flameParticles.filter(p => {
+      p.x  += p.vx;
+      p.y  += p.vy;
+      p.vy *= 0.97;
+      p.vx *= 0.98;
+      p.size *= 0.985;
+      p.life -= p.decay;
+      return p.life > 0;
+    });
+  }
+
+  function drawFlames() {
+    flameParticles.forEach(p => {
+      const a = p.life;
+      const white  = Math.round(p.life * 220);
+      const yellow = Math.round(p.life * 200);
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+      grad.addColorStop(0,    `rgba(255,255,${white},${a})`);
+      grad.addColorStop(0.35, `rgba(255,${yellow},0,${a * 0.85})`);
+      grad.addColorStop(0.7,  `rgba(220,40,0,${a * 0.5})`);
+      grad.addColorStop(1,    `rgba(80,0,0,0)`);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    });
+  }
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   const paddleBottom = H - PADDLE_Y_OFFSET;
@@ -241,6 +304,8 @@
       lives--;
       flashFrames = 30;
       updateHUD();
+      spawnFlames();
+      playMiss();
       if (lives <= 0) { gameOver = true; return; }
       // Reset the ball
       b.x  = W / 2;
@@ -330,7 +395,7 @@
 
   function restart() {
     score = 0; lives = MAX_LIVES; gameOver = false; flashFrames = 0;
-    balls = resetBalls(); bullets = [];
+    balls = resetBalls(); bullets = []; flameParticles = [];
     updateHUD();
   }
 
@@ -350,11 +415,13 @@
     if (!gameOver) {
       movePaddleByKeys();
       updateBullets();
+      updateFlames();
       balls.forEach(updateBall);
     }
 
     balls.forEach(drawTrail);
     balls.forEach(drawBall);
+    drawFlames();
     drawBullets();
     drawPaddle();
 
