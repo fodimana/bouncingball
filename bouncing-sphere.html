@@ -58,6 +58,7 @@
   let score = 0, lives = MAX_LIVES, gameOver = false, flashFrames = 0;
   let paddleX = W / 2;
   let bullets = [];
+  let doubleBullets = false;
 
   const scoreEl = document.getElementById('scoreDisplay');
   const livesEl = document.getElementById('livesDisplay');
@@ -115,8 +116,12 @@
       if (gameOver) { restart(); return; }
       const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
       const pt = (H - PADDLE_Y_OFFSET) - PADDLE_H;
-      bullets.push({ x: px - 8, y: pt - 4 });
-      bullets.push({ x: px + 8, y: pt - 4 });
+      if (doubleBullets) {
+        bullets.push({ x: px - 8, y: pt - 4 });
+        bullets.push({ x: px + 8, y: pt - 4 });
+      } else {
+        bullets.push({ x: px, y: pt - 4 });
+      }
       playShoot();
     }
   });
@@ -325,7 +330,7 @@
     // Wall collisions
     if (b.x - b.r <= 0)  { b.x = b.r;  b.vx =  Math.abs(b.vx) * WALL_DAMPING; playBounce(); }
     if (b.x + b.r >= W)  { b.x = W - b.r; b.vx = -Math.abs(b.vx) * WALL_DAMPING; playBounce(); }
-    if (b.y - b.r <= 0)  { b.y = b.r;  b.vy =  Math.abs(b.vy) * 0.82; playBounce(); spawnSparkles(b.x); }
+    if (b.y - b.r <= 0)  { b.y = b.r;  b.vy =  Math.abs(b.vy) * 0.82; playBounce(); spawnSparkles(b.x); doubleBullets = true; }
 
     // Paddle collision
     const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
@@ -441,7 +446,7 @@
 
   function restart() {
     score = 0; lives = MAX_LIVES; gameOver = false; flashFrames = 0;
-    balls = resetBalls(); bullets = []; flameParticles = []; sparkleParticles = [];
+    balls = resetBalls(); bullets = []; flameParticles = []; sparkleParticles = []; doubleBullets = false;
     updateHUD();
   }
 
