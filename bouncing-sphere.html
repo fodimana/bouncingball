@@ -3,48 +3,76 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bouncing Red Sphere</title>
+  <title>Catch the Balls</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: #0a0a0f;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       height: 100vh;
       overflow: hidden;
+      font-family: monospace;
+      color: #fff;
     }
     canvas {
       border-radius: 12px;
       box-shadow: 0 0 40px rgba(255, 60, 60, 0.15);
+      cursor: none;
     }
+    #hud {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 10px;
+      font-size: 18px;
+      letter-spacing: 2px;
+    }
+    #hud span { color: #aaa; }
+    #hud b { color: #fff; }
   </style>
 </head>
 <body>
+<div id="hud">
+  <div><span>SCORE </span><b id="scoreDisplay">0</b></div>
+  <div><span>LIVES </span><b id="livesDisplay">❤️❤️❤️</b></div>
+</div>
 <canvas id="canvas"></canvas>
 <script>
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
   canvas.width  = Math.min(window.innerWidth  - 40, 800);
-  canvas.height = Math.min(window.innerHeight - 40, 600);
+  canvas.height = Math.min(window.innerHeight - 120, 580);
 
   const W = canvas.width;
   const H = canvas.height;
 
-  const GRAVITY       = 0.45;
-  const ENERGY_BOOST  = 1.08;   // multiply vy on floor bounce
-  const DAMPING       = 0.82;   // energy kept after floor bounce
-  const WALL_DAMPING  = 0.88;
-  const RADIUS        = 22;
-  const MAX_SPEED     = 66;
-  const TRAIL_LENGTH  = 60;
+  // --- Game state ---
+  const PADDLE_W = 110, PADDLE_H = 14, PADDLE_Y_OFFSET = 18;
+  const RADIUS = 22, TRAIL_LENGTH = 60;
+  const GRAVITY = 0.38, WALL_DAMPING = 0.88, MAX_SPEED = 66;
+  const MAX_LIVES = 3;
 
-  // Ball definitions: position, velocity, radius, and colour theme
-  const balls = [
+  let score = 0, lives = MAX_LIVES, gameOver = false, flashFrames = 0;
+  let paddleX = W / 2;
+
+  const scoreEl = document.getElementById('scoreDisplay');
+  const livesEl = document.getElementById('livesDisplay');
+
+  function updateHUD() {
+    scoreEl.textContent = score;
+    livesEl.textContent = '❤️'.repeat(lives) + '🖤'.repeat(MAX_LIVES - lives);
+  }
+
+  function makeBall(x, y, vx, vy, colors) {
+    return { x, y, vx, vy, r: RADIUS, trail: [], colors, caught: false };
+  }
+
+  const BALL_DEFS = [
     {
-      x: W / 3,   y: H / 4,  vx: 13.5,  vy: 6,   r: RADIUS,
-      trail: [],
+      vx: 5, vy: 3,
       colors: {
         glowA: 'rgba(120,255,80,0.25)', glowB: 'rgba(30,220,30,0.12)', glowC: 'rgba(0,180,0,0)',
         hi: '#80ff60', mid: '#20e820', lo: '#006b00',
@@ -52,8 +80,7 @@
       },
     },
     {
-      x: W * 2/3, y: H / 3,  vx: -10.5, vy: 9,   r: RADIUS,
-      trail: [],
+      vx: -4, vy: 5,
       colors: {
         glowA: 'rgba(80,160,255,0.25)', glowB: 'rgba(30,80,220,0.12)', glowC: 'rgba(0,0,180,0)',
         hi: '#60b0ff', mid: '#2060e8', lo: '#00006b',
@@ -62,31 +89,71 @@
     },
   ];
 
-  function clamp(v, lo, hi) {
-    return Math.max(lo, Math.min(hi, v));
+  function resetBalls() {
+    return [
+      makeBall(W / 3,   H / 4, BALL_DEFS[0].vx, BALL_DEFS[0].vy, BALL_DEFS[0].colors),
+      makeBall(W * 2/3, H / 3, BALL_DEFS[1].vx, BALL_DEFS[1].vy, BALL_DEFS[1].colors),
+    ];
   }
 
+  let balls = resetBalls();
+
+  // Paddle follows mouse / touch
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    paddleX = e.clientX - rect.left;
+  });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    paddleX = e.touches[0].clientX - rect.left;
+  }, { passive: false });
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  const paddleBottom = H - PADDLE_Y_OFFSET;
+  const paddleTop    = paddleBottom - PADDLE_H;
+
   function updateBall(b) {
+    if (b.caught) return;
     b.vy += GRAVITY;
     b.x  += b.vx;
     b.y  += b.vy;
 
-    if (b.y + b.r >= H) {
-      b.y  = H - b.r;
-      b.vy = -Math.abs(b.vy) * DAMPING * ENERGY_BOOST;
-      b.vy = clamp(b.vy, -MAX_SPEED, -1);
+    // Wall collisions
+    if (b.x - b.r <= 0)  { b.x = b.r;  b.vx =  Math.abs(b.vx) * WALL_DAMPING; }
+    if (b.x + b.r >= W)  { b.x = W - b.r; b.vx = -Math.abs(b.vx) * WALL_DAMPING; }
+    if (b.y - b.r <= 0)  { b.y = b.r;  b.vy =  Math.abs(b.vy) * 0.82; }
+
+    // Paddle collision
+    const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
+    const paddleLeft  = px - PADDLE_W / 2;
+    const paddleRight = px + PADDLE_W / 2;
+    if (b.vy > 0 && b.y + b.r >= paddleTop && b.y + b.r <= paddleBottom + b.r
+        && b.x >= paddleLeft && b.x <= paddleRight) {
+      b.y  = paddleTop - b.r;
+      b.vy = -Math.abs(b.vy) * 0.85;
+      b.vy = clamp(b.vy, -MAX_SPEED, -2);
+      // Add a bit of horizontal nudge based on hit position
+      const hitPos = (b.x - px) / (PADDLE_W / 2); // -1 to 1
+      b.vx += hitPos * 3;
+      b.vx  = clamp(b.vx, -MAX_SPEED * 0.6, MAX_SPEED * 0.6);
+      score++;
+      updateHUD();
     }
-    if (b.y - b.r <= 0) {
-      b.y  = b.r;
-      b.vy = Math.abs(b.vy) * DAMPING;
-    }
-    if (b.x - b.r <= 0) {
-      b.x  = b.r;
-      b.vx = Math.abs(b.vx) * WALL_DAMPING;
-    }
-    if (b.x + b.r >= W) {
-      b.x  = W - b.r;
-      b.vx = -Math.abs(b.vx) * WALL_DAMPING;
+
+    // Fell past floor
+    if (b.y - b.r > H) {
+      lives--;
+      flashFrames = 30;
+      updateHUD();
+      if (lives <= 0) { gameOver = true; return; }
+      // Reset this ball
+      b.x  = b === balls[0] ? W / 3 : W * 2 / 3;
+      b.y  = H / 4;
+      b.vx = BALL_DEFS[balls.indexOf(b)].vx * (1 + score * 0.02);
+      b.vy = BALL_DEFS[balls.indexOf(b)].vy;
+      b.trail = [];
     }
 
     b.trail.push({ x: b.x, y: b.y });
@@ -94,113 +161,114 @@
   }
 
   function collideBalls(a, b) {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
+    const dx = b.x - a.x, dy = b.y - a.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     const minDist = a.r + b.r;
     if (dist === 0 || dist >= minDist) return;
-
-    // Separate overlap
     const overlap = (minDist - dist) / 2;
-    const nx = dx / dist;
-    const ny = dy / dist;
-    a.x -= nx * overlap;
-    a.y -= ny * overlap;
-    b.x += nx * overlap;
-    b.y += ny * overlap;
-
-    // Elastic collision (equal mass)
-    const dvx = a.vx - b.vx;
-    const dvy = a.vy - b.vy;
-    const dot  = dvx * nx + dvy * ny;
+    const nx = dx / dist, ny = dy / dist;
+    a.x -= nx * overlap; a.y -= ny * overlap;
+    b.x += nx * overlap; b.y += ny * overlap;
+    const dvx = a.vx - b.vx, dvy = a.vy - b.vy;
+    const dot = dvx * nx + dvy * ny;
     if (dot <= 0) return;
-    a.vx -= dot * nx;
-    a.vy -= dot * ny;
-    b.vx += dot * nx;
-    b.vy += dot * ny;
-  }
-
-  function update() {
-    balls.forEach(updateBall);
-    collideBalls(balls[0], balls[1]);
+    a.vx -= dot * nx; a.vy -= dot * ny;
+    b.vx += dot * nx; b.vy += dot * ny;
   }
 
   function drawTrail(b) {
     const c = b.colors;
     for (let i = 1; i < b.trail.length; i++) {
-      const t     = i / b.trail.length;
-      const alpha = t * 0.7;
-      const size  = b.r * (0.15 + 0.85 * t);
+      const t = i / b.trail.length;
       ctx.beginPath();
-      ctx.arc(b.trail[i].x, b.trail[i].y, size, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${c.trailR(t)},${c.trailG(t)},${c.trailB(t)},${alpha})`;
+      ctx.arc(b.trail[i].x, b.trail[i].y, b.r * (0.15 + 0.85 * t), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${c.trailR(t)},${c.trailG(t)},${c.trailB(t)},${t * 0.7})`;
       ctx.fill();
     }
   }
 
   function drawBall(b) {
     const c = b.colors;
+    const glow = ctx.createRadialGradient(b.x - b.r*0.3, b.y - b.r*0.35, b.r*0.05, b.x, b.y, b.r*1.6);
+    glow.addColorStop(0, c.glowA); glow.addColorStop(0.5, c.glowB); glow.addColorStop(1, c.glowC);
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.6, 0, Math.PI * 2);
+    ctx.fillStyle = glow; ctx.fill();
 
-    const glow = ctx.createRadialGradient(
-      b.x - b.r * 0.3, b.y - b.r * 0.35, b.r * 0.05,
-      b.x,              b.y,               b.r * 1.6
-    );
-    glow.addColorStop(0,   c.glowA);
-    glow.addColorStop(0.5, c.glowB);
-    glow.addColorStop(1,   c.glowC);
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r * 1.6, 0, Math.PI * 2);
-    ctx.fillStyle = glow;
-    ctx.fill();
+    const grad = ctx.createRadialGradient(b.x - b.r*0.35, b.y - b.r*0.35, b.r*0.1, b.x, b.y, b.r);
+    grad.addColorStop(0, c.hi); grad.addColorStop(0.4, c.mid); grad.addColorStop(1, c.lo);
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = grad; ctx.fill();
 
-    const grad = ctx.createRadialGradient(
-      b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.1,
-      b.x,               b.y,               b.r
-    );
-    grad.addColorStop(0,   c.hi);
-    grad.addColorStop(0.4, c.mid);
-    grad.addColorStop(1,   c.lo);
+    const spec = ctx.createRadialGradient(b.x - b.r*0.32, b.y - b.r*0.38, 1, b.x - b.r*0.2, b.y - b.r*0.25, b.r*0.55);
+    spec.addColorStop(0, 'rgba(255,255,255,0.75)'); spec.addColorStop(0.5, 'rgba(255,255,255,0.15)'); spec.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = spec; ctx.fill();
+  }
+
+  function drawPaddle() {
+    const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
+    const grad = ctx.createLinearGradient(px - PADDLE_W/2, paddleTop, px + PADDLE_W/2, paddleBottom);
+    grad.addColorStop(0,   '#ffffff');
+    grad.addColorStop(0.5, '#a0cfff');
+    grad.addColorStop(1,   '#5090dd');
     ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.roundRect(px - PADDLE_W/2, paddleTop, PADDLE_W, PADDLE_H, 7);
     ctx.fillStyle = grad;
     ctx.fill();
-
-    const spec = ctx.createRadialGradient(
-      b.x - b.r * 0.32, b.y - b.r * 0.38, 1,
-      b.x - b.r * 0.2,  b.y - b.r * 0.25, b.r * 0.55
-    );
-    spec.addColorStop(0,   'rgba(255,255,255,0.75)');
-    spec.addColorStop(0.5, 'rgba(255,255,255,0.15)');
-    spec.addColorStop(1,   'rgba(255,255,255,0)');
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    ctx.fillStyle = spec;
+    // glow
+    ctx.shadowColor = 'rgba(100,180,255,0.7)';
+    ctx.shadowBlur  = 14;
     ctx.fill();
+    ctx.shadowBlur  = 0;
   }
 
-  function drawFloor() {
-    const floorGrad = ctx.createLinearGradient(0, H - 3, 0, H);
-    floorGrad.addColorStop(0, 'rgba(60,255,60,0.25)');
-    floorGrad.addColorStop(1, 'rgba(0,180,0,0.05)');
-    ctx.fillStyle = floorGrad;
-    ctx.fillRect(0, H - 3, W, 3);
-  }
-
-  function draw() {
-    ctx.fillStyle = 'rgba(10,10,15,0.55)';
+  function drawOverlay(msg, sub) {
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.fillRect(0, 0, W, H);
-
-    drawFloor();
-    balls.forEach(drawTrail);
-    balls.forEach(drawBall);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 48px monospace';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(msg, W/2, H/2 - 20);
+    ctx.font = '22px monospace';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText(sub, W/2, H/2 + 28);
   }
+
+  function restart() {
+    score = 0; lives = MAX_LIVES; gameOver = false; flashFrames = 0;
+    balls = resetBalls();
+    updateHUD();
+  }
+
+  canvas.addEventListener('click', () => { if (gameOver) restart(); });
+  document.addEventListener('keydown', e => { if (gameOver && e.code === 'Space') restart(); });
 
   function loop() {
-    update();
-    draw();
+    // Flash red on miss
+    if (flashFrames > 0) {
+      ctx.fillStyle = `rgba(255,0,0,${0.18 * flashFrames / 30})`;
+      ctx.fillRect(0, 0, W, H);
+      flashFrames--;
+    } else {
+      ctx.fillStyle = 'rgba(10,10,15,0.55)';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    if (!gameOver) {
+      balls.forEach(updateBall);
+      collideBalls(balls[0], balls[1]);
+    }
+
+    balls.forEach(drawTrail);
+    balls.forEach(drawBall);
+    drawPaddle();
+
+    if (gameOver) drawOverlay('GAME OVER', `Score: ${score}  —  Click or Space to restart`);
+
     requestAnimationFrame(loop);
   }
 
+  updateHUD();
   loop();
 </script>
 </body>
