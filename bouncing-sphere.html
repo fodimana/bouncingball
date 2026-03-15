@@ -79,20 +79,11 @@
         trailR: (t) => Math.round(120 * (1 - t)), trailG: () => 255, trailB: () => 20,
       },
     },
-    {
-      vx: -2, vy: 2.5,
-      colors: {
-        glowA: 'rgba(80,160,255,0.25)', glowB: 'rgba(30,80,220,0.12)', glowC: 'rgba(0,0,180,0)',
-        hi: '#60b0ff', mid: '#2060e8', lo: '#00006b',
-        trailR: () => 20, trailG: (t) => Math.round(120 * (1 - t)), trailB: () => 255,
-      },
-    },
   ];
 
   function resetBalls() {
     return [
-      makeBall(W / 3,   H / 4, BALL_DEFS[0].vx, BALL_DEFS[0].vy, BALL_DEFS[0].colors),
-      makeBall(W * 2/3, H / 3, BALL_DEFS[1].vx, BALL_DEFS[1].vy, BALL_DEFS[1].colors),
+      makeBall(W / 2, H / 4, BALL_DEFS[0].vx, BALL_DEFS[0].vy, BALL_DEFS[0].colors),
     ];
   }
 
@@ -165,11 +156,11 @@
       flashFrames = 30;
       updateHUD();
       if (lives <= 0) { gameOver = true; return; }
-      // Reset this ball
-      b.x  = b === balls[0] ? W / 3 : W * 2 / 3;
+      // Reset the ball
+      b.x  = W / 2;
       b.y  = H / 4;
-      b.vx = BALL_DEFS[balls.indexOf(b)].vx * (1 + score * 0.02);
-      b.vy = BALL_DEFS[balls.indexOf(b)].vy;
+      b.vx = BALL_DEFS[0].vx * (1 + score * 0.02);
+      b.vy = BALL_DEFS[0].vy;
       b.trail = [];
     }
 
@@ -274,7 +265,6 @@
     if (!gameOver) {
       movePaddleByKeys();
       balls.forEach(updateBall);
-      collideBalls(balls[0], balls[1]);
     }
 
     balls.forEach(drawTrail);
