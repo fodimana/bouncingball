@@ -60,6 +60,29 @@
   let bullets = [];
   let doubleBullets = false;
 
+  // --- High Score ---
+  const HS_KEY = 'bouncingball_hs';
+  function loadScores() {
+    try { return JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch { return []; }
+  }
+  function saveScores(list) { localStorage.setItem(HS_KEY, JSON.stringify(list)); }
+  function isHighScore(s) {
+    const list = loadScores();
+    return list.length < 10 || s > list[list.length - 1].score;
+  }
+  function addScore(name, s) {
+    const list = loadScores();
+    list.push({ name: name.toUpperCase(), score: s });
+    list.sort((a, b) => b.score - a.score);
+    if (list.length > 10) list.length = 10;
+    saveScores(list);
+  }
+
+  // Name-entry state
+  let enteringName = false;
+  let nameChars = ['A', 'A', 'A'];
+  let nameCursor = 0; // which char is being edited
+
   const scoreEl = document.getElementById('scoreDisplay');
   const livesEl = document.getElementById('livesDisplay');
 
@@ -106,25 +129,6 @@
   const PADDLE_SPEED = 8;
   const BULLET_SPEED = 12;
   const keys = {};
-  document.addEventListener('keydown', e => {
-    if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
-      e.preventDefault();
-      keys[e.code] = true;
-    }
-    if (e.code === 'Space') {
-      e.preventDefault();
-      if (gameOver) { restart(); return; }
-      const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
-      const pt = (H - PADDLE_Y_OFFSET) - PADDLE_H;
-      if (doubleBullets) {
-        bullets.push({ x: px - 8, y: pt - 4 });
-        bullets.push({ x: px + 8, y: pt - 4 });
-      } else {
-        bullets.push({ x: px, y: pt - 4 });
-      }
-      playShoot();
-    }
-  });
   document.addEventListener('keyup', e => { keys[e.code] = false; });
 
   function movePaddleByKeys() {
@@ -372,7 +376,14 @@
       updateHUD();
       spawnFlames();
       playMiss();
-      if (lives <= 0) { gameOver = true; return; }
+      if (lives <= 0) {
+        gameOver = true;
+        if (isHighScore(score)) {
+          enteringName = true;
+          nameChars = ['A','A','A']; nameCursor = 0;
+        }
+        return;
+      }
       // Reset the ball
       b.x  = W / 2;
       b.y  = H / 4;
@@ -536,13 +547,118 @@
     ctx.fillText(sub, W/2, H/2 + 28);
   }
 
+  function drawNameEntry() {
+    ctx.fillStyle = 'rgba(0,0,0,0.82)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+
+    ctx.font = 'bold 36px monospace';
+    ctx.fillStyle = '#ffe040';
+    ctx.fillText('NEW HIGH SCORE!', W/2, H/2 - 110);
+
+    ctx.font = '24px monospace';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`Score: ${score}`, W/2, H/2 - 70);
+
+    ctx.font = '20px monospace';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('Enter your name (↑↓ to change, → to confirm)', W/2, H/2 - 30);
+
+    // Draw the 3 letter boxes
+    const boxW = 52, boxH = 60, gap = 18;
+    const totalW = 3 * boxW + 2 * gap;
+    const startX = W/2 - totalW/2;
+    const boxY = H/2 + 0;
+
+    nameChars.forEach((ch, i) => {
+      const bx = startX + i * (boxW + gap);
+      const isActive = i === nameCursor;
+      ctx.fillStyle = isActive ? 'rgba(255,224,64,0.2)' : 'rgba(255,255,255,0.08)';
+      ctx.beginPath(); ctx.roundRect(bx, boxY, boxW, boxH, 8); ctx.fill();
+      ctx.strokeStyle = isActive ? '#ffe040' : '#555';
+      ctx.lineWidth = isActive ? 3 : 1.5;
+      ctx.beginPath(); ctx.roundRect(bx, boxY, boxW, boxH, 8); ctx.stroke();
+
+      ctx.font = `bold 38px monospace`;
+      ctx.fillStyle = isActive ? '#ffe040' : '#fff';
+      ctx.fillText(ch, bx + boxW/2, boxY + 44);
+    });
+
+    ctx.font = '17px monospace';
+    ctx.fillStyle = '#888';
+    ctx.fillText('Press ENTER to save', W/2, H/2 + 90);
+  }
+
+  function drawHighScoreScreen() {
+    ctx.fillStyle = 'rgba(0,0,0,0.88)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+
+    ctx.font = 'bold 34px monospace';
+    ctx.fillStyle = '#ffe040';
+    ctx.fillText('HIGH SCORES', W/2, 60);
+
+    const list = loadScores();
+    const rowH = 34, startY = 100;
+    list.forEach((entry, i) => {
+      const y = startY + i * rowH;
+      const isNew = entry.name === nameChars.join('') && entry.score === score && i === list.findIndex(e => e.name === nameChars.join('') && e.score === score);
+      ctx.font = isNew ? 'bold 22px monospace' : '20px monospace';
+      ctx.fillStyle = i === 0 ? '#ffe040' : isNew ? '#80ff80' : '#ccc';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${i+1}.`, W/2 - 100, y);
+      ctx.textAlign = 'left';
+      ctx.fillText(entry.name, W/2 - 80, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(entry.score, W/2 + 100, y);
+    });
+
+    ctx.textAlign = 'center';
+    ctx.font = '18px monospace';
+    ctx.fillStyle = '#666';
+    ctx.fillText('Press SPACE or click to play again', W/2, H - 30);
+  }
+
   function restart() {
     score = 0; lives = MAX_LIVES; gameOver = false; flashFrames = 0;
+    enteringName = false; nameChars = ['A','A','A']; nameCursor = 0;
     balls = resetBalls(); bullets = []; flameParticles = []; sparkleParticles = []; doubleBullets = false;
     updateHUD();
   }
 
-  canvas.addEventListener('click', () => { if (gameOver) restart(); });
+  canvas.addEventListener('click', () => { if (gameOver && !enteringName) restart(); });
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+      e.preventDefault();
+      keys[e.code] = true;
+    }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (gameOver && !enteringName) { restart(); return; }
+      if (!gameOver) {
+        const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
+        const pt = (H - PADDLE_Y_OFFSET) - PADDLE_H;
+        if (doubleBullets) {
+          bullets.push({ x: px - 8, y: pt - 4 });
+          bullets.push({ x: px + 8, y: pt - 4 });
+        } else {
+          bullets.push({ x: px, y: pt - 4 });
+        }
+        playShoot();
+      }
+    }
+    if (enteringName) {
+      if (e.code === 'ArrowUp')   { e.preventDefault(); nameChars[nameCursor] = String.fromCharCode((nameChars[nameCursor].charCodeAt(0) - 65 + 1) % 26 + 65); }
+      if (e.code === 'ArrowDown') { e.preventDefault(); nameChars[nameCursor] = String.fromCharCode((nameChars[nameCursor].charCodeAt(0) - 65 + 25) % 26 + 65); }
+      if (e.code === 'ArrowRight' || e.code === 'Tab') { e.preventDefault(); nameCursor = Math.min(2, nameCursor + 1); }
+      if (e.code === 'ArrowLeft') { e.preventDefault(); nameCursor = Math.max(0, nameCursor - 1); }
+      if (e.code === 'Enter') {
+        addScore(nameChars.join(''), score);
+        enteringName = false;
+      }
+    }
+  });
 
   function loop() {
     // Flash red on miss
@@ -570,7 +686,10 @@
     drawBullets();
     drawPaddle();
 
-    if (gameOver) drawOverlay('GAME OVER', `Score: ${score}  —  Click or Space to restart`);
+    if (gameOver) {
+      if (enteringName) drawNameEntry();
+      else drawHighScoreScreen();
+    }
 
     requestAnimationFrame(loop);
   }
