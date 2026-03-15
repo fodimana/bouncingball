@@ -109,6 +109,23 @@
     paddleX = e.touches[0].clientX - rect.left;
   }, { passive: false });
 
+  // Arrow key control
+  const PADDLE_SPEED = 8;
+  const keys = {};
+  document.addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+      e.preventDefault();
+      keys[e.code] = true;
+    }
+  });
+  document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+  function movePaddleByKeys() {
+    if (keys['ArrowLeft'])  paddleX -= PADDLE_SPEED;
+    if (keys['ArrowRight']) paddleX += PADDLE_SPEED;
+    paddleX = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
+  }
+
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
   const paddleBottom = H - PADDLE_Y_OFFSET;
@@ -255,6 +272,7 @@
     }
 
     if (!gameOver) {
+      movePaddleByKeys();
       balls.forEach(updateBall);
       collideBalls(balls[0], balls[1]);
     }
