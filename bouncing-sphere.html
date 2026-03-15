@@ -114,7 +114,9 @@
       e.preventDefault();
       if (gameOver) { restart(); return; }
       const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
-      bullets.push({ x: px, y: paddleTop - 4 });
+      const pt = (H - PADDLE_Y_OFFSET) - PADDLE_H;
+      bullets.push({ x: px, y: pt - 4 });
+      playShoot();
     }
   });
   document.addEventListener('keyup', e => { keys[e.code] = false; });
@@ -135,7 +137,7 @@
       if (Math.sqrt(dx*dx + dy*dy) < ball.r + 4) {
         score++;
         updateHUD();
-        // Knock the ball away from the bullet direction
+        playHit(); from the bullet direction
         ball.vy = -Math.abs(ball.vy) * 1.1 - 4;
         ball.vx += (ball.x - bu.x) * 0.15;
         return false;
@@ -159,8 +161,48 @@
 
 
 
-  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  // --- Audio ---
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
+  function playBounce() {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(320, audioCtx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(160, audioCtx.currentTime + 0.12);
+    g.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+    o.start(); o.stop(audioCtx.currentTime + 0.15);
+  }
+
+  function playShoot() {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type = 'square';
+    o.frequency.setValueAtTime(880, audioCtx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(220, audioCtx.currentTime + 0.08);
+    g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+    o.start(); o.stop(audioCtx.currentTime + 0.1);
+  }
+
+  function playHit() {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(600, audioCtx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.25);
+    g.gain.setValueAtTime(0.35, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    o.start(); o.stop(audioCtx.currentTime + 0.25);
+  }
+
+
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   const paddleBottom = H - PADDLE_Y_OFFSET;
   const paddleTop    = paddleBottom - PADDLE_H;
 
@@ -171,9 +213,9 @@
     b.y  += b.vy;
 
     // Wall collisions
-    if (b.x - b.r <= 0)  { b.x = b.r;  b.vx =  Math.abs(b.vx) * WALL_DAMPING; }
-    if (b.x + b.r >= W)  { b.x = W - b.r; b.vx = -Math.abs(b.vx) * WALL_DAMPING; }
-    if (b.y - b.r <= 0)  { b.y = b.r;  b.vy =  Math.abs(b.vy) * 0.82; }
+    if (b.x - b.r <= 0)  { b.x = b.r;  b.vx =  Math.abs(b.vx) * WALL_DAMPING; playBounce(); }
+    if (b.x + b.r >= W)  { b.x = W - b.r; b.vx = -Math.abs(b.vx) * WALL_DAMPING; playBounce(); }
+    if (b.y - b.r <= 0)  { b.y = b.r;  b.vy =  Math.abs(b.vy) * 0.82; playBounce(); }
 
     // Paddle collision
     const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
@@ -190,6 +232,7 @@
       b.vx  = clamp(b.vx, -MAX_SPEED * 0.6, MAX_SPEED * 0.6);
       score++;
       updateHUD();
+      playBounce();
     }
 
     // Fell past floor
