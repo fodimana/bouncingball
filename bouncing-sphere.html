@@ -115,7 +115,8 @@
       if (gameOver) { restart(); return; }
       const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
       const pt = (H - PADDLE_Y_OFFSET) - PADDLE_H;
-      bullets.push({ x: px, y: pt - 4 });
+      bullets.push({ x: px - 8, y: pt - 4 });
+      bullets.push({ x: px + 8, y: pt - 4 });
       playShoot();
     }
   });
@@ -266,6 +267,51 @@
     });
   }
 
+  // --- Sparkle particles ---
+  let sparkleParticles = [];
+  const SPARKLE_COLORS = ['#fff', '#ffe066', '#ff66ff', '#66ffff', '#ff6666', '#66ff66'];
+
+  function spawnSparkles(x) {
+    for (let i = 0; i < 60; i++) {
+      const angle = Math.random() * Math.PI; // downward hemisphere
+      const speed = Math.random() * 7 + 2;
+      sparkleParticles.push({
+        x,
+        y: 0,
+        vx: Math.cos(angle) * speed * (Math.random() < 0.5 ? 1 : -1),
+        vy: Math.sin(angle) * speed,
+        life: 1.0,
+        decay: Math.random() * 0.022 + 0.012,
+        size: Math.random() * 3 + 1.5,
+        color: SPARKLE_COLORS[Math.floor(Math.random() * SPARKLE_COLORS.length)],
+      });
+    }
+  }
+
+  function updateSparkles() {
+    sparkleParticles = sparkleParticles.filter(p => {
+      p.x  += p.vx;
+      p.y  += p.vy;
+      p.vy += 0.18; // gentle gravity
+      p.life -= p.decay;
+      return p.life > 0 && p.y < H;
+    });
+  }
+
+  function drawSparkles() {
+    sparkleParticles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   const paddleBottom = H - PADDLE_Y_OFFSET;
   const paddleTop    = paddleBottom - PADDLE_H;
@@ -279,7 +325,7 @@
     // Wall collisions
     if (b.x - b.r <= 0)  { b.x = b.r;  b.vx =  Math.abs(b.vx) * WALL_DAMPING; playBounce(); }
     if (b.x + b.r >= W)  { b.x = W - b.r; b.vx = -Math.abs(b.vx) * WALL_DAMPING; playBounce(); }
-    if (b.y - b.r <= 0)  { b.y = b.r;  b.vy =  Math.abs(b.vy) * 0.82; playBounce(); }
+    if (b.y - b.r <= 0)  { b.y = b.r;  b.vy =  Math.abs(b.vy) * 0.82; playBounce(); spawnSparkles(b.x); }
 
     // Paddle collision
     const px = clamp(paddleX, PADDLE_W / 2, W - PADDLE_W / 2);
@@ -395,7 +441,7 @@
 
   function restart() {
     score = 0; lives = MAX_LIVES; gameOver = false; flashFrames = 0;
-    balls = resetBalls(); bullets = []; flameParticles = [];
+    balls = resetBalls(); bullets = []; flameParticles = []; sparkleParticles = [];
     updateHUD();
   }
 
@@ -416,12 +462,14 @@
       movePaddleByKeys();
       updateBullets();
       updateFlames();
+      updateSparkles();
       balls.forEach(updateBall);
     }
 
     balls.forEach(drawTrail);
     balls.forEach(drawBall);
     drawFlames();
+    drawSparkles();
     drawBullets();
     drawPaddle();
 
