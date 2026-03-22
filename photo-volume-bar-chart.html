@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Estimated Photographs Taken Over 50 Years</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    :root {
+      --bg-a: #091221;
+      --bg-b: #123259;
+      --panel: rgba(10, 20, 36, 0.88);
+      --grid: rgba(167, 210, 255, 0.2);
+      --text: #e9f4ff;
+      --muted: #9db6d4;
+      --bar-a: #ffb546;
+      --bar-b: #ff6f3c;
+      --bar-hover: #ffd899;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(130% 95% at 8% 8%, #245486 0%, rgba(36, 84, 134, 0) 45%),
+        radial-gradient(90% 100% at 94% 85%, #194772 0%, rgba(25, 71, 114, 0) 48%),
+        linear-gradient(160deg, var(--bg-a), var(--bg-b));
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .card {
+      width: min(1100px, 100%);
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 22px 60px rgba(2, 8, 18, 0.45);
+      backdrop-filter: blur(5px);
+    }
+
+    h1 {
+      font-size: clamp(1.1rem, 2vw, 1.8rem);
+      letter-spacing: 0.02em;
+      margin-bottom: 6px;
+    }
+
+    .sub {
+      color: var(--muted);
+      margin-bottom: 14px;
+      line-height: 1.35;
+      font-size: 0.95rem;
+    }
+
+    canvas {
+      width: 100%;
+      height: min(70vh, 560px);
+      display: block;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+    }
+
+    .legend {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.35;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Estimated Number of Photographs Taken (5-Year Intervals)</h1>
+    <p class="sub">Estimated global totals for each 5-year period across the last 50 years. Values are shown in billions of photos.</p>
+    <canvas id="chart" width="1080" height="560" aria-label="Bar chart of estimated photographs taken"></canvas>
+    <p class="legend">Source style: synthesized estimate trend for visualization. Real-world totals vary by methodology and source.</p>
+  </main>
+
+  <script>
+    const ctx = document.getElementById("chart").getContext("2d");
+
+    const data = [
+      { period: "1976-1980", value: 75 },
+      { period: "1981-1985", value: 92 },
+      { period: "1986-1990", value: 118 },
+      { period: "1991-1995", value: 165 },
+      { period: "1996-2000", value: 270 },
+      { period: "2001-2005", value: 480 },
+      { period: "2006-2010", value: 1400 },
+      { period: "2011-2015", value: 5300 },
+      { period: "2016-2020", value: 9600 },
+      { period: "2021-2025", value: 13000 }
+    ];
+
+    const layout = {
+      left: 88,
+      right: 28,
+      top: 34,
+      bottom: 72,
+      axisColor: "rgba(220,240,255,0.75)",
+      gridColor: "rgba(167,210,255,0.2)"
+    };
+
+    function roundedRect(context, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      context.beginPath();
+      context.moveTo(x + r, y);
+      context.lineTo(x + width - r, y);
+      context.quadraticCurveTo(x + width, y, x + width, y + r);
+      context.lineTo(x + width, y + height - r);
+      context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      context.lineTo(x + r, y + height);
+      context.quadraticCurveTo(x, y + height, x, y + height - r);
+      context.lineTo(x, y + r);
+      context.quadraticCurveTo(x, y, x + r, y);
+      context.closePath();
+    }
+
+    function syncCanvasSize() {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const displayWidth = ctx.canvas.offsetWidth || ctx.canvas.clientWidth || 1080;
+      const displayHeight = ctx.canvas.offsetHeight || ctx.canvas.clientHeight || 560;
+      const w = Math.floor(displayWidth * dpr);
+      const h = Math.floor(displayHeight * dpr);
+      if (ctx.canvas.width !== w || ctx.canvas.height !== h) {
+        ctx.canvas.width = w;
+        ctx.canvas.height = h;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    }
+
+    function drawChart() {
+      syncCanvasSize();
+      const width = ctx.canvas.width / (window.devicePixelRatio || 1);
+      const height = ctx.canvas.height / (window.devicePixelRatio || 1);
+      const chartW = width - layout.left - layout.right;
+      const chartH = height - layout.top - layout.bottom;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const maxValue = Math.max(...data.map(d => d.value));
+      const yTicks = 5;
+
+      ctx.font = "500 12px Space Grotesk, sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+
+      for (let i = 0; i <= yTicks; i++) {
+        const t = i / yTicks;
+        const y = layout.top + chartH - t * chartH;
+        const tickValue = Math.round((maxValue * t) / 500) * 500;
+
+        ctx.strokeStyle = layout.gridColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(layout.left, y);
+        ctx.lineTo(width - layout.right, y);
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(220,240,255,0.9)";
+        ctx.fillText(`${tickValue.toLocaleString()}B`, layout.left - 12, y);
+      }
+
+      ctx.strokeStyle = layout.axisColor;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(layout.left, layout.top);
+      ctx.lineTo(layout.left, height - layout.bottom);
+      ctx.lineTo(width - layout.right, height - layout.bottom);
+      ctx.stroke();
+
+      const slotWidth = chartW / data.length;
+      const barWidth = slotWidth * 0.62;
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+
+      data.forEach((d, index) => {
+        const barHeight = (d.value / maxValue) * chartH;
+        const x = layout.left + slotWidth * index + (slotWidth - barWidth) / 2;
+        const y = layout.top + (chartH - barHeight);
+
+        const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
+        gradient.addColorStop(0, "#ffb546");
+        gradient.addColorStop(1, "#ff6f3c");
+
+        ctx.save();
+        roundedRect(ctx, x, y, barWidth, barHeight, 8);
+        ctx.fillStyle = gradient;
+        ctx.shadowColor = "rgba(255, 160, 90, 0.4)";
+        ctx.shadowBlur = 14;
+        ctx.fill();
+        ctx.restore();
+
+        ctx.fillStyle = "rgba(236, 246, 255, 0.95)";
+        ctx.font = "500 11px Space Grotesk, sans-serif";
+        ctx.fillText(d.period, x + barWidth / 2, height - layout.bottom + 10);
+
+        ctx.fillStyle = "rgba(255, 227, 194, 0.95)";
+        ctx.font = "700 11px Space Grotesk, sans-serif";
+        ctx.fillText(`${d.value.toLocaleString()}B`, x + barWidth / 2, y - 16);
+      });
+
+      ctx.save();
+      ctx.translate(24, layout.top + chartH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(226,242,255,0.9)";
+      ctx.font = "700 12px Space Grotesk, sans-serif";
+      ctx.fillText("Estimated Photos (Billions)", 0, 0);
+      ctx.restore();
+
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(226,242,255,0.9)";
+      ctx.font = "700 12px Space Grotesk, sans-serif";
+      ctx.fillText("5-Year Intervals", layout.left + chartW / 2, height - 18);
+    }
+
+    drawChart();
+
+    window.addEventListener("resize", drawChart);
+  </script>
+</body>
+</html>
